@@ -1,0 +1,15 @@
+{
+    "schemaVersion": 1,
+    "id": "seagleNet.power-saver",
+    "name": "Power Saver",
+    "version": "1.0.0",
+    "author": "seagleNet",
+    "description": "Switches to power-saver at low battery and turns off the desktop effects you choose while power-saver is active.",
+    "kinds": [
+        "service"
+    ],
+    "entryPoints": {
+        "service": "Service.qml"
+    },
+    "license": "MIT"
+}
