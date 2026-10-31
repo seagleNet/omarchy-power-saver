@@ -103,7 +103,15 @@ effects.
 
 Saving a file in the plugin directory restarts the plugin, but with the code
 the shell already loaded. Run `omarchy restart shell` to pick up changes to
-`Service.qml`, and after renaming the plugin.
+`Service.qml` or `effects.sh`, and after renaming the plugin.
+
+`effects.sh` writes and removes the Hyprland toggle file. The plugin loads its
+text once at startup and runs it with `bash -c`, so the cleanup on removal does
+not depend on the file still being there. It can also be run on its own:
+
+```sh
+bash effects.sh saver animations blur   # or: bash effects.sh normal
+```
 
 QML is formatted with Qt's `qmlformat` using the checked-in `.qmlformat.ini`
 (two-space indent, only essential semicolons):
