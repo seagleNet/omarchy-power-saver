@@ -83,7 +83,7 @@ The plugin logs to the Omarchy shell's log: what it changes and why as `INFO`,
 and problems such as invalid settings or a failed step as `WARN`.
 
 ```sh
-qs log -p "$OMARCHY_PATH/shell" | grep seagleNet.power-saver:
+qs log --log-times -p "$OMARCHY_PATH/shell" | grep seagleNet.power-saver:
 ```
 
 Add `-f` to follow it. That log only covers the running shell; Omarchy also
