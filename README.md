@@ -25,7 +25,7 @@ It is a background service with no bar widget.
 omarchy plugin add https://github.com/seagleNet/omarchy-power-saver --enable
 ```
 
-This installs it to `~/.config/omarchy/plugins/seagleNet.power-saver` and
+This installs it to `~/.config/omarchy/plugins/seaglenet.power-saver` and
 enables it.
 
 ## Settings
@@ -35,7 +35,7 @@ Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:
 ```json
 "plugins": [
   {
-    "id": "seagleNet.power-saver",
+    "id": "seaglenet.power-saver",
     "threshold": 25,
     "disable": { "transparency": true, "animations": false }
   }
@@ -83,7 +83,7 @@ The plugin logs to the Omarchy shell's log: what it changes and why as `INFO`,
 and problems such as invalid settings or a failed step as `WARN`.
 
 ```sh
-qs log --log-times -p "$OMARCHY_PATH/shell" | grep seagleNet.power-saver:
+qs log --log-times -p "$OMARCHY_PATH/shell" | grep seaglenet.power-saver:
 ```
 
 Add `-f` to follow it. That log only covers the running shell; Omarchy also
@@ -93,7 +93,7 @@ keeps it in the journal, which goes back further:
 ## Uninstall
 
 ```sh
-omarchy plugin remove seagleNet.power-saver
+omarchy plugin remove seaglenet.power-saver
 ```
 
 Removing the plugin unloads it first, which deletes its file and restores your

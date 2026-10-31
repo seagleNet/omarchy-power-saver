@@ -23,7 +23,7 @@ import Quickshell.Services.UPower
 Item {
   id: root
 
-  readonly property string pluginId: "seagleNet.power-saver"
+  readonly property string pluginId: "seaglenet.power-saver"
   readonly property int defaultThreshold: 20
 
   // Every effect the plugin can turn off, in the order they are logged, and
@@ -53,7 +53,7 @@ Item {
   property bool started: false
 
   // Events are logged as INFO and problems as WARN in the shell's log:
-  // qs log -p "$OMARCHY_PATH/shell" | grep seagleNet.power-saver:
+  // qs log -p "$OMARCHY_PATH/shell" | grep seaglenet.power-saver:
   function log(message) {
     console.info(pluginId + ": " + message)
   }
@@ -156,7 +156,7 @@ Item {
 
   PersistentProperties {
     id: persisted
-    reloadableId: "seagleNet-power-saver"
+    reloadableId: "seaglenet-power-saver"
     property bool switchedThisDischarge: false
   }
 

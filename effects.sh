@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turns the power-saver desktop effects on and off for the seagleNet.power-saver
+# Turns the power-saver desktop effects on and off for the seaglenet.power-saver
 # shell plugin. Service.qml runs it with `bash -c`, from the text it loaded at
 # startup, so the cleanup still works while the plugin directory is removed.
 #
@@ -23,7 +23,7 @@ try() {
 supported() {
     ! hyprctl getoption "$1" | grep -q "no such option"
 }
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/seagleNet-power-saver.lock" || fail "could not open the lock file"
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/seaglenet-power-saver.lock" || fail "could not open the lock file"
 flock 9 || fail "could not take the lock"
 toggles="$HOME/.local/state/omarchy/toggles/hypr"
 file="$toggles/power-saver.lua"
@@ -53,7 +53,7 @@ if [[ $mode == saver ]]; then
     done
 fi
 if [[ -n $content ]]; then
-    content="-- Written by the seagleNet.power-saver shell plugin while power-saver is active.$nl$content"
+    content="-- Written by the seaglenet.power-saver shell plugin while power-saver is active.$nl$content"
     if [[ $(cat "$file" 2>/dev/null)$nl != "$content" ]]; then
         try mkdir -p "$toggles"
         try tee "$file" <<<"${content%"$nl"}"

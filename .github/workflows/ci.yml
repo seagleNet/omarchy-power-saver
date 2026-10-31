@@ -48,7 +48,7 @@ jobs:
 
       - name: manifest.json
         run: |
-          jq -e '.id == "seagleNet.power-saver" and .entryPoints.service == "Service.qml"' manifest.json
+          jq -e '.id == "seaglenet.power-saver" and .entryPoints.service == "Service.qml"' manifest.json
           jq -r '.entryPoints[]' manifest.json | xargs ls -l
 
   test:

@@ -11,7 +11,7 @@ setup() {
     mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
     : >"$HYPRCTL_LOG"
     TOGGLE="$HOME/.local/state/omarchy/toggles/hypr/power-saver.lua"
-    HEADER="-- Written by the seagleNet.power-saver shell plugin while power-saver is active."
+    HEADER="-- Written by the seaglenet.power-saver shell plugin while power-saver is active."
 }
 
 # Runs the script the way Service.qml does: its text through `bash -c`.

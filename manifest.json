@@ -1,8 +1,8 @@
 {
     "schemaVersion": 1,
-    "id": "seagleNet.power-saver",
+    "id": "seaglenet.power-saver",
     "name": "Power Saver",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "seagleNet",
     "description": "Switches to power-saver at low battery and turns off the desktop effects you choose while power-saver is active.",
     "kinds": [
