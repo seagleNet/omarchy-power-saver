@@ -28,6 +28,19 @@ omarchy plugin add https://github.com/seagleNet/omarchy-power-saver --enable
 This installs it to `~/.config/omarchy/plugins/seaglenet.power-saver` and
 enables it.
 
+`omarchy plugin add` and `omarchy plugin update` install the newest commit on
+`master`, not a fixed version. `master` only moves on a release, so this is the
+latest release. To check what you have:
+
+```sh
+git -C ~/.config/omarchy/plugins/seaglenet.power-saver describe --tags --always
+```
+
+It prints the release, such as `v1.0.1`, which should match the latest
+[release](https://github.com/seagleNet/omarchy-power-saver/releases) and the
+version on the [marketplace page](https://omarchyplugins.com/plugin.html?id=seaglenet.power-saver).
+Anything longer, such as `v1.0.1-2-gabc1234`, is a commit after that release.
+
 ## Settings
 
 Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:

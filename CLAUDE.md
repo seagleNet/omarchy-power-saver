@@ -24,3 +24,18 @@ wrong:
 - Run `bats tests` for every change. `bats tests/integration` runs against the
   live Hyprland session and reloads its config, so ask before running it; CI
   cannot run it.
+
+## Releasing
+
+`omarchy plugin add` and `update` install `master`'s newest commit, and the
+marketplace listing is verified for one exact commit. So `master` only moves on
+a release, and stays on the verified commit in between:
+
+- Work on `dev`; merge into `master` only to release.
+- A release bumps `version` in `manifest.json`, then gets a `vX.Y.Z` tag and a
+  GitHub release.
+- Right after pushing `master`, submit the new commit through the
+  [Plugin verification form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml),
+  choosing "Verify and publish a newer upstream commit". Until it is approved,
+  the listing shows "Update unverified".
+- Plugin IDs are permanent and must be lowercase.
