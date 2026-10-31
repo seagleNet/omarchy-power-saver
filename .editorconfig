@@ -6,6 +6,10 @@ insert_final_newline = true
 charset = utf-8
 
 # shfmt reads these: 4-space indent, otherwise its defaults.
-[*.sh]
+[*.{sh,bats}]
+indent_style = space
+indent_size = 4
+
+[tests/bin/*]
 indent_style = space
 indent_size = 4

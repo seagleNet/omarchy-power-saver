@@ -120,6 +120,27 @@ QML is formatted with Qt's `qmlformat` using the checked-in `.qmlformat.ini`
 /usr/lib/qt6/bin/qmlformat -i Service.qml
 ```
 
+Shell files are formatted with `shfmt` (4-space indent, from `.editorconfig`).
+The checks CI runs, on every push and pull request:
+
+```sh
+/usr/lib/qt6/bin/qmllint Service.qml   # settings in .qmllint.ini
+shfmt -d . && shfmt -f . | xargs shellcheck
+bats tests                             # effects.sh against a fake hyprctl
+```
+
+CI has no Hyprland, so after Hyprland or Omarchy updates, also run the
+integration tests in your session. They check `effects.sh` against the running
+Hyprland and your Omarchy config. Effects flicker off and on while they run,
+and everything is put back afterwards:
+
+```sh
+bats tests/integration
+```
+
+The security workflow runs Semgrep and zizmor. A finding fails
+the job and shows up in its log.
+
 ## License
 
 [MIT](LICENSE)

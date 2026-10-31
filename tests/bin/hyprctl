@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Stand-in for hyprctl in the effects.sh tests. Logs every call to
+# $HYPRCTL_LOG, reports the options in $HYPRCTL_UNSUPPORTED (space-separated)
+# as missing, and fails reloads when $HYPRCTL_FAIL_RELOAD is set.
+
+echo "$*" >>"$HYPRCTL_LOG"
+case $1 in
+getoption)
+    if [[ " ${HYPRCTL_UNSUPPORTED:-} " == *" $2 "* ]]; then
+        echo "no such option"
+    else
+        echo "bool: true"
+    fi
+    ;;
+reload)
+    if [[ -n ${HYPRCTL_FAIL_RELOAD:-} ]]; then
+        echo "reload refused" >&2
+        exit 1
+    fi
+    echo "ok"
+    ;;
+esac

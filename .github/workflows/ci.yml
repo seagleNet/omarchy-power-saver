@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    # Arch, like Omarchy, so Qt and Quickshell match what the plugin runs on
+    # and qmllint can resolve the Quickshell imports. The image is pinned, but
+    # every run upgrades it to the current packages; the keyring goes first so
+    # an older image still accepts packages signed with newer keys.
+    container: archlinux:base-20261025.0.616225
+    permissions:
+      contents: read
+    steps:
+      - name: Install tools
+        run: |
+          pacman -Sy --noconfirm --needed archlinux-keyring
+          pacman -Su --noconfirm --needed qt6-declarative quickshell shellcheck shfmt jq diffutils
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: qmlformat
+        run: /usr/lib/qt6/bin/qmlformat Service.qml | diff -u Service.qml -
+
+      # Settings in .qmllint.ini: any warning fails.
+      - name: qmllint
+        run: /usr/lib/qt6/bin/qmllint Service.qml
+
+      - name: shfmt
+        run: shfmt -d .
+
+      - name: ShellCheck
+        run: shfmt -f . | xargs shellcheck
+
+      - name: manifest.json
+        run: |
+          jq -e '.id == "seagleNet.power-saver" and .entryPoints.service == "Service.qml"' manifest.json
+          jq -r '.entryPoints[]' manifest.json | xargs ls -l
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    container: archlinux:base-20261025.0.616225
+    permissions:
+      contents: read
+    steps:
+      - name: Install tools
+        run: |
+          pacman -Sy --noconfirm --needed archlinux-keyring
+          pacman -Su --noconfirm --needed bats
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: bats
+        run: bats --print-output-on-failure tests
