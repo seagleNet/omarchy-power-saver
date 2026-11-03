@@ -16,7 +16,9 @@ import Quickshell.Services.UPower
 //    The file only ever turns things off, so removing it brings back exactly
 //    what the user had, including effects they turned off themselves.
 //    If "dim" is set, it also lowers the built-in panel's backlight, and puts
-//    it back afterwards unless the user changed it in the meantime.
+//    it back afterwards unless the user changed it in the meantime. If
+//    "refreshRate" is set, the same file also puts the built-in panel on the
+//    fastest mode it lists at that rate or below.
 //
 // The file is removed when the service is unloaded, which is the only hook a
 // plugin gets when it is disabled or removed. That also happens on a plugin
@@ -44,14 +46,18 @@ Item {
 
   // Settings live on this plugin's entry in ~/.config/omarchy/shell.json: a
   // "threshold" percentage, a "disable" object of effect names to booleans and
-  // a "dim" percentage for the backlight, or false for none.
+  // a "dim" percentage for the backlight and a "refreshRate" in Hz, each false
+  // for none.
   // The shell hands service plugins no settings, so the file is read here. It
   // is only ever read, never written.
   property int threshold: defaultThreshold
   property var effects: defaultEffects()
   // The backlight percentage to dim to in power-saver; 0 leaves it alone.
   property int dim: 0
-  readonly property string effectsKey: effects.join(" ") + (dim > 0 ? " dim=" + dim : "")
+  // The highest refresh rate in power-saver, in Hz; 0 leaves it alone.
+  property int refreshRate: 0
+  readonly property var extraArgs: (dim > 0 ? ["dim=" + dim] : []).concat(refreshRate > 0 ? ["refresh=" + refreshRate] : [])
+  readonly property string effectsKey: effects.concat(extraArgs).join(" ")
   // The last settings problems reported, so a file reload repeats none.
   property string settingsWarning: ""
   // Set once the startup line is logged, which already names the settings.
@@ -81,11 +87,22 @@ Item {
     return level > 0 ? "dimming the screen to " + level + "%" : "not dimming the screen"
   }
 
+  readonly property string feedbackUrl: "https://github.com/seagleNet/omarchy-power-saver/issues/new?template=refresh-rate.yml"
+
+  function noteExperimental() {
+    log("refreshRate is experimental and not yet tried on a high-refresh laptop; please report how it works: " + feedbackUrl)
+  }
+
+  function describeRefresh(rate) {
+    return rate > 0 ? "refresh rate at most " + rate + " Hz" : "keeping the refresh rate"
+  }
+
   // A missing or empty file means the defaults; one that does not parse keeps
   // the current settings, since it is most likely being edited.
   function readSettings() {
     var nextThreshold = defaultThreshold
     var nextDim = 0
+    var nextRefresh = 0
     var chosen = Object.assign({}, effectDefaults)
     var problems = []
     var raw = String(settingsFile.text() || "")
@@ -121,6 +138,13 @@ Item {
         else
           problems.push("ignoring dim " + JSON.stringify(entry.dim) + ", expected a percentage from 1 to 100 or false; not dimming the screen")
       }
+      if (entry && entry.refreshRate !== undefined && entry.refreshRate !== false) {
+        var rate = entry.refreshRate
+        if (typeof rate === "number" && isFinite(rate) && rate >= 30 && rate <= 1000)
+          nextRefresh = Math.round(rate)
+        else
+          problems.push("ignoring refreshRate " + JSON.stringify(entry.refreshRate) + ", expected a rate in Hz from 30 to 1000 or false; keeping the refresh rate")
+      }
       if (entry && entry.disable !== undefined) {
         var disable = entry.disable
         if (!disable || typeof disable !== "object" || Array.isArray(disable)) {
@@ -152,9 +176,15 @@ Item {
       log("in power-saver, turning off: " + describeEffects(nextEffects))
     if (started && nextDim !== dim)
       log("in power-saver, " + describeDim(nextDim))
+    if (started && nextRefresh !== refreshRate) {
+      log("in power-saver, " + describeRefresh(nextRefresh))
+      if (refreshRate === 0)
+        noteExperimental()
+    }
     threshold = nextThreshold
     effects = nextEffects
     dim = nextDim
+    refreshRate = nextRefresh
   }
 
   FileView {
@@ -236,7 +266,7 @@ Item {
       return
     pending = {
       "key": want,
-      "args": saver ? ["saver"].concat(effects, dim > 0 ? ["dim=" + dim] : []) : ["normal"]
+      "args": saver ? ["saver"].concat(effects, extraArgs) : ["normal"]
     }
     if (!effectsProcess.running)
       runPending()
@@ -270,6 +300,7 @@ Item {
     var skipped = []
     var restored = false
     var screen = []
+    var problems = []
     var error = ""
     var lines = String(output || "").split("\n")
     for (var i = 0; i < lines.length; i++) {
@@ -292,6 +323,20 @@ Item {
         screen.push("brightness left at " + line.slice(16) + "%, since it was changed while dimmed")
       else if (line === "no backlight")
         screen.push("no backlight to dim")
+      else if (line.indexOf("refresh kept ") === 0)
+        screen.push("refresh rate already " + line.slice(13) + " Hz, not lowered")
+      else if (line.indexOf("refresh unsupported ") === 0)
+        screen.push("the laptop screen has no refresh rate at or below " + line.slice(20) + " Hz at its resolution, not lowered")
+      else if (line.indexOf("refresh failed ") === 0)
+        problems.push("the laptop screen did not switch to " + line.slice(15) + " Hz, so its refresh rate was left as it was")
+      else if (line === "refresh mirrored")
+        screen.push("the laptop screen mirrors another display, refresh rate not lowered")
+      else if (line.indexOf("refresh restored ") === 0)
+        screen.push("refresh rate restored to " + line.slice(17) + " Hz")
+      else if (line.indexOf("refresh ") === 0)
+        screen.push("refresh rate lowered from " + line.slice(8).replace(" ", " to ") + " Hz")
+      else if (line === "no laptop screen")
+        screen.push("no laptop screen to lower the refresh rate of")
     }
     var what = mode === "saver" ? "power-saver on" : "power-saver off"
     var done = []
@@ -301,7 +346,14 @@ Item {
       done.push("skipped " + skipped.join(", ") + " (not in this Hyprland)")
     if (restored)
       done.push("effects restored")
+    // A refused rate was taken out again, so it was never lowered.
+    if (problems.length > 0)
+      screen = screen.filter(function (entry) {
+        return entry.indexOf("refresh rate lowered") !== 0
+      })
     done = done.concat(screen)
+    for (var j = 0; j < problems.length; j++)
+      warn(what + ": " + problems[j])
     if (error !== "")
       warn(what + " failed: " + error + (done.length > 0 ? " (done before that: " + done.join("; ") + ")" : ""))
     else if (done.length > 0)
@@ -361,7 +413,9 @@ Item {
     onTriggered: {
       var level = root.batteryLevel()
       var power = level < 0 ? "no battery" : level + "% " + (UPower.onBattery ? "on battery" : "on AC")
-      root.log("started: profile " + root.profileName() + ", " + power + ", threshold " + root.threshold + "%, in power-saver turning off: " + root.describeEffects(root.effects) + ", " + root.describeDim(root.dim))
+      root.log("started: profile " + root.profileName() + ", " + power + ", threshold " + root.threshold + "%, in power-saver turning off: " + root.describeEffects(root.effects) + ", " + root.describeDim(root.dim) + ", " + root.describeRefresh(root.refreshRate))
+      if (root.refreshRate > 0)
+        root.noteExperimental()
       root.started = true
       root.apply()
     }
@@ -375,7 +429,7 @@ Item {
   // Detached, so the cleanup outlives this object. It reports nothing back,
   // since nothing is left to receive it.
   Component.onDestruction: {
-    log(applied.indexOf("saver") === 0 ? "stopped, restoring effects" + (applied.indexOf(" dim=") !== -1 ? " and brightness" : "") : "stopped")
+    log(applied.indexOf("saver") === 0 ? "stopped, restoring effects" + (applied.indexOf(" dim=") !== -1 ? " and brightness" : "") + (applied.indexOf(" refresh=") !== -1 ? " and refresh rate" : "") : "stopped")
     if (effectsScript !== "")
       Quickshell.execDetached(["bash", "-c", effectsScript, "power-saver", "normal"])
   }

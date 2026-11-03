@@ -1,0 +1,68 @@
+name: Refresh rate feedback
+description: Report how the experimental refreshRate setting works on your laptop, whether it worked or not.
+title: "refreshRate on <laptop model>"
+labels: ["refresh-rate"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying `refreshRate`! It has only been tested against fakes,
+        so every report helps, including "it just worked".
+  - type: input
+    id: laptop
+    attributes:
+      label: Laptop model
+      placeholder: ASUS TUF Gaming A15 FA507
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: What happened when power-saver started?
+      options:
+        - The rate went down and the picture stayed fine
+        - The plugin logged that the screen did not switch and put it back
+        - The screen went black or garbled
+        - Nothing changed
+        - Something else (describe below)
+    validations:
+      required: true
+  - type: dropdown
+    id: restored
+    attributes:
+      label: Did the rate come back when power-saver ended?
+      options:
+        - "Yes"
+        - "No"
+        - Did not get that far
+    validations:
+      required: true
+  - type: input
+    id: setting
+    attributes:
+      label: Your refreshRate setting
+      placeholder: "60"
+    validations:
+      required: true
+  - type: textarea
+    id: monitors
+    attributes:
+      label: Your laptop screen's modes
+      description: "Output of: hyprctl monitors -j | jq '.[] | {name, width, height, refreshRate, mirrorOf, availableModes}'"
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Plugin log
+      description: "Output of: qs log --log-times -p \"$OMARCHY_PATH/shell\" | grep seaglenet.power-saver:"
+      render: text
+  - type: textarea
+    id: setup
+    attributes:
+      label: Anything else
+      description: >-
+        Graphics (for example AMD with NVIDIA, MUX switch setting), whether you
+        picked a rate in the monitor panel, `omarchy version`, and anything
+        else that seems relevant.
