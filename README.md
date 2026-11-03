@@ -132,6 +132,11 @@ With `dim`, the screen is dimmed through `brightnessctl`, on the backlight
 times the effects are, so a reload in `power-saver` also briefly brightens the
 screen. If you changed the brightness while dimmed, a reload dims it again.
 
+The plugin keeps that file and its lock only in your own runtime directory,
+which must not be writable by others, as a desktop session's is. Without one
+it changes nothing and logs why, rather than falling back to a shared
+directory such as `/tmp`.
+
 With `refreshRate`, the toggle file also holds a monitor rule for the built-in
 screen that sets only its mode, so its position and scale stay yours. The
 monitor panel's saved settings load after the toggle files, so the rule applies

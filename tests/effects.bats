@@ -309,3 +309,95 @@ hl.config({ decoration = { blur = { enabled = false } } })" ]
     [ "$output" = "refresh mirrored" ]
     [ ! -e "$TOGGLE" ]
 }
+
+@test "without XDG_RUNTIME_DIR nothing runs, and /tmp is not used instead" {
+    effects saver animations
+    [ "$status" -eq 0 ]
+    unset XDG_RUNTIME_DIR
+    effects normal
+    [ "$status" -eq 1 ]
+    [ "$output" = "error: no private runtime directory in XDG_RUNTIME_DIR" ]
+    [ -f "$TOGGLE" ]
+    [ "$(reloads)" -eq 1 ]
+}
+
+@test "a runtime directory others can write to is refused" {
+    chmod 777 "$XDG_RUNTIME_DIR"
+    effects saver dim=30
+    [ "$status" -eq 1 ]
+    [ "$output" = "error: no private runtime directory in XDG_RUNTIME_DIR" ]
+    [ "$(brightness)" -eq 800 ]
+    chmod 700 "$XDG_RUNTIME_DIR"
+    effects saver dim=30
+    [ "$status" -eq 0 ]
+}
+
+@test "a symlinked runtime directory is refused" {
+    mkdir "$BATS_TEST_TMPDIR/elsewhere"
+    ln -s "$BATS_TEST_TMPDIR/elsewhere" "$BATS_TEST_TMPDIR/link"
+    XDG_RUNTIME_DIR="$BATS_TEST_TMPDIR/link" effects saver dim=30
+    [ "$status" -eq 1 ]
+    [ "$output" = "error: no private runtime directory in XDG_RUNTIME_DIR" ]
+}
+
+@test "code hidden in the brightness state never runs" {
+    # Bash arithmetic runs a command substitution in an array subscript.
+    # shellcheck disable=SC2016 # it must reach the script unexpanded
+    payload='a[$(touch "$BATS_TEST_TMPDIR/ran")]'
+    for state in "panel $payload 300" "panel 800 $payload"; do
+        for mode in saver normal; do
+            echo "$state" >"$STATE"
+            if [[ $mode == saver ]]; then effects saver dim=30; else effects normal; fi
+            [ "$status" -eq 1 ]
+            [ "$output" = "error: removed an invalid brightness state file" ]
+            [ ! -e "$STATE" ]
+            [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+        done
+    done
+    [ "$(brightness)" -eq 800 ]
+}
+
+@test "a brightness state that is not plain numbers is removed" {
+    for state in "panel 0800 300" "panel 800 1234567890" "panel 800" "pa/nel 800 300" "panel -1 300" ""; do
+        echo "$state" >"$STATE"
+        effects normal
+        [ "$status" -eq 1 ]
+        [ "$output" = "error: removed an invalid brightness state file" ]
+        [ ! -e "$STATE" ]
+    done
+    [ "$(brightness)" -eq 800 ]
+}
+
+@test "a symlinked brightness state is removed, not followed" {
+    echo "panel 800 300" >"$BATS_TEST_TMPDIR/target"
+    ln -s "$BATS_TEST_TMPDIR/target" "$STATE"
+    effects normal
+    [ "$status" -eq 1 ]
+    [ "$output" = "error: removed an invalid brightness state file" ]
+    [ ! -L "$STATE" ]
+    [ "$(cat "$BATS_TEST_TMPDIR/target")" = "panel 800 300" ]
+}
+
+@test "levels with leading zeros are refused, not read as octal" {
+    for arg in dim=08 dim=030 refresh=060 refresh=0060; do
+        effects saver "$arg"
+        [ "$status" -eq 1 ]
+        [[ $output == "error: invalid "* ]]
+    done
+    [ "$(brightness)" -eq 800 ]
+}
+
+@test "a backlight with a maximum of 0 counts as none" {
+    BRIGHTNESS_MAX=0 effects saver dim=30
+    [ "$status" -eq 0 ]
+    [ "$output" = "no backlight" ]
+    [ ! -e "$STATE" ]
+}
+
+@test "dim never turns the backlight off, even with few levels" {
+    echo 10 >"$BRIGHTNESS_FILE"
+    BRIGHTNESS_MAX=10 effects saver dim=1
+    [ "$status" -eq 0 ]
+    [ "$output" = "dimmed 100 10" ]
+    [ "$(brightness)" -eq 1 ]
+}

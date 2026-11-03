@@ -40,12 +40,38 @@ try() {
 supported() {
     ! hyprctl getoption "$1" | grep -q "no such option"
 }
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/seaglenet-power-saver.lock" || fail "could not open the lock file"
+# The lock and the brightness state live in the user's own runtime directory,
+# and nowhere else: in a shared one such as /tmp another user could create
+# them first, and the state is read back into arithmetic.
+runtime=${XDG_RUNTIME_DIR:-}
+runtime_mode=""
+if [[ -n $runtime && -d $runtime && ! -L $runtime && -O $runtime ]]; then
+    runtime_mode=$(stat -c %a "$runtime" 2>/dev/null)
+fi
+# Anything but an octal mode without group or other write fails closed.
+if ! [[ $runtime_mode =~ ^[0-7]{3,4}$ ]] || ((8#$runtime_mode & 8#022)); then
+    fail "no private runtime directory in XDG_RUNTIME_DIR"
+fi
+exec 9>"$runtime/seaglenet-power-saver.lock" || fail "could not open the lock file"
 flock 9 || fail "could not take the lock"
-brightness_state="${XDG_RUNTIME_DIR:-/tmp}/seaglenet-power-saver.brightness"
-# Prints the raw current and maximum brightness of a backlight device.
+brightness_state="$runtime/seaglenet-power-saver.brightness"
+# Prints the raw current and maximum brightness of a backlight device, or
+# fails unless both are plain decimals, since they go into arithmetic.
 read_brightness() {
-    brightnessctl -m -d "$1" 2>/dev/null | awk -F, '{ print $3, $5; found = 1 } END { exit !found }'
+    brightnessctl -m -d "$1" 2>/dev/null | awk -F, '
+        $3 ~ /^(0|[1-9][0-9]{0,8})$/ && $5 ~ /^[1-9][0-9]{0,8}$/ { print $3, $5; found = 1 }
+        END { exit !found }'
+}
+# Reads the state file into the caller's device, saved and set. Its values go
+# into arithmetic, which would run code hidden in them, so a file that is not
+# a plain one of ours holding a device name and two plain decimals is removed.
+read_state() {
+    if [[ -f $brightness_state && ! -L $brightness_state && -O $brightness_state ]]; then
+        read -r device saved set <"$brightness_state"
+        [[ $device =~ ^[A-Za-z0-9._:-]{1,64}$ && $saved =~ ^(0|[1-9][0-9]{0,8})$ && $set =~ ^(0|[1-9][0-9]{0,8})$ ]] && return 0
+    fi
+    rm -f "$brightness_state"
+    fail "removed an invalid brightness state file"
 }
 percent() {
     echo $((($1 * 100 + $2 / 2) / $2))
@@ -54,8 +80,8 @@ percent() {
 # state file holds the device, the level before dimming and the level set.
 dim_screen() {
     local device saved set current max target
-    if [[ -f $brightness_state ]]; then
-        read -r device saved set <"$brightness_state"
+    if [[ -e $brightness_state || -L $brightness_state ]]; then
+        read_state
         read -r current max < <(read_brightness "$device") || fail "could not read the brightness of $device"
         if [[ $current != "$set" ]]; then
             echo "brightness kept $(percent "$current" "$max")"
@@ -88,8 +114,8 @@ dim_screen() {
 # dim_screen set.
 restore_brightness() {
     local device saved set current max
-    [[ -f $brightness_state ]] || return 0
-    read -r device saved set <"$brightness_state"
+    [[ -e $brightness_state || -L $brightness_state ]] || return 0
+    read_state
     if read -r current max < <(read_brightness "$device"); then
         if [[ $current != "$set" ]]; then
             echo "brightness kept $(percent "$current" "$max")"
@@ -194,14 +220,14 @@ if [[ $mode == saver ]]; then
         case $effect in
         dim=*)
             dim=${effect#dim=}
-            if ! [[ $dim =~ ^[0-9]+$ ]] || ((dim < 1 || dim > 100)); then
+            if ! [[ $dim =~ ^[1-9][0-9]{0,2}$ ]] || ((dim > 100)); then
                 fail "invalid dim level ${dim@Q}, expected 1 to 100"
             fi
             continue
             ;;
         refresh=*)
             refresh=${effect#refresh=}
-            if ! [[ $refresh =~ ^[0-9]+$ ]] || ((refresh < 30 || refresh > 1000)); then
+            if ! [[ $refresh =~ ^[1-9][0-9]{1,3}$ ]] || ((refresh < 30 || refresh > 1000)); then
                 fail "invalid refresh rate ${refresh@Q}, expected 30 to 1000"
             fi
             continue
