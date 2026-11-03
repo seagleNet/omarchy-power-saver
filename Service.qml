@@ -56,6 +56,8 @@ Item {
   property int dim: 0
   // The highest refresh rate in power-saver, in Hz; 0 leaves it alone.
   property int refreshRate: 0
+  // Whether power-saver switching on and off shows a notification.
+  property bool notifications: true
   readonly property var extraArgs: (dim > 0 ? ["dim=" + dim] : []).concat(refreshRate > 0 ? ["refresh=" + refreshRate] : [])
   readonly property string effectsKey: effects.concat(extraArgs).join(" ")
   // The last settings problems reported, so a file reload repeats none.
@@ -103,6 +105,7 @@ Item {
     var nextThreshold = defaultThreshold
     var nextDim = 0
     var nextRefresh = 0
+    var nextNotifications = true
     var chosen = Object.assign({}, effectDefaults)
     var problems = []
     var raw = String(settingsFile.text() || "")
@@ -145,6 +148,12 @@ Item {
         else
           problems.push("ignoring refreshRate " + JSON.stringify(entry.refreshRate) + ", expected a rate in Hz from 30 to 1000 or false; keeping the refresh rate")
       }
+      if (entry && entry.notify !== undefined) {
+        if (typeof entry.notify === "boolean")
+          nextNotifications = entry.notify
+        else
+          problems.push("ignoring notify " + JSON.stringify(entry.notify) + ", expected true or false; showing notifications")
+      }
       if (entry && entry.disable !== undefined) {
         var disable = entry.disable
         if (!disable || typeof disable !== "object" || Array.isArray(disable)) {
@@ -185,6 +194,9 @@ Item {
     effects = nextEffects
     dim = nextDim
     refreshRate = nextRefresh
+    if (started && nextNotifications !== notifications)
+      log(nextNotifications ? "notifications on" : "notifications off")
+    notifications = nextNotifications
   }
 
   FileView {
@@ -255,19 +267,46 @@ Item {
       return
     }
     log("battery at " + level + "% (threshold " + threshold + "%), switching from " + profileName() + " to power-saver")
+    autoSwitch = {
+      "level": level,
+      "from": profileName(),
+      "at": Date.now()
+    }
     PowerProfiles.profile = PowerProfile.PowerSaver
+  }
+
+  // Set by checkBattery as it switches, so the notification can say why.
+  property var autoSwitch: null
+  // Set when the profile switches, for the run that follows to announce.
+  property var notice: null
+
+  function profileSwitched() {
+    if (started) {
+      // The profile change arrives over D-Bus, so allow it a moment.
+      var auto = saver && autoSwitch !== null && Date.now() - autoSwitch.at < 10000 ? autoSwitch : null
+      notice = {
+        "auto": auto
+      }
+    }
+    autoSwitch = null
+    apply()
   }
 
   function apply() {
     if (!started)
       return
     var want = saver ? "saver " + effectsKey : "normal"
-    if (want === applied)
+    if (want === applied) {
+      // Switched back before anything changed: nothing to announce.
+      notice = null
       return
+    }
     pending = {
       "key": want,
-      "args": saver ? ["saver"].concat(effects, extraArgs) : ["normal"]
+      "args": saver ? ["saver"].concat(effects, extraArgs) : ["normal"],
+      "notice": notice || (pending ? pending.notice : null)
     }
+    notice = null
     if (!effectsProcess.running)
       runPending()
   }
@@ -279,6 +318,7 @@ Item {
     pending = null
     effectsProcess.key = run.key
     effectsProcess.mode = run.args[0]
+    effectsProcess.notice = run.notice
     effectsProcess.command = ["bash", "-c", effectsScript, "power-saver"].concat(run.args)
     effectsProcess.running = true
   }
@@ -295,8 +335,11 @@ Item {
   }
   readonly property string effectsScript: String(effectsFile.text() || "")
 
-  function reportRun(mode, output) {
+  function reportRun(mode, output, notice) {
     var off = []
+    var dimmedTo = ""
+    var refreshTo = ""
+    var back = []
     var skipped = []
     var restored = false
     var screen = []
@@ -313,13 +356,15 @@ Item {
         skipped.push(line.slice(8))
       else if (line === "restored")
         restored = true
-      else if (line.indexOf("dimmed ") === 0)
+      else if (line.indexOf("dimmed ") === 0) {
+        dimmedTo = line.split(" ")[2]
         screen.push("dimmed the screen from " + line.slice(7).replace(" ", "% to ") + "%")
-      else if (line.indexOf("not dimmed ") === 0)
+      } else if (line.indexOf("not dimmed ") === 0)
         screen.push("screen already at " + line.slice(11) + "%, not dimmed")
-      else if (line.indexOf("brightness restored ") === 0)
+      else if (line.indexOf("brightness restored ") === 0) {
+        back.push("brightness")
         screen.push("brightness restored to " + line.slice(20) + "%")
-      else if (line.indexOf("brightness kept ") === 0)
+      } else if (line.indexOf("brightness kept ") === 0)
         screen.push("brightness left at " + line.slice(16) + "%, since it was changed while dimmed")
       else if (line === "no backlight")
         screen.push("no backlight to dim")
@@ -331,11 +376,13 @@ Item {
         problems.push("the laptop screen did not switch to " + line.slice(15) + " Hz, so its refresh rate was left as it was")
       else if (line === "refresh mirrored")
         screen.push("the laptop screen mirrors another display, refresh rate not lowered")
-      else if (line.indexOf("refresh restored ") === 0)
+      else if (line.indexOf("refresh restored ") === 0) {
+        back.push("refresh rate")
         screen.push("refresh rate restored to " + line.slice(17) + " Hz")
-      else if (line.indexOf("refresh ") === 0)
+      } else if (line.indexOf("refresh ") === 0) {
+        refreshTo = line.split(" ")[2]
         screen.push("refresh rate lowered from " + line.slice(8).replace(" ", " to ") + " Hz")
-      else if (line === "no laptop screen")
+      } else if (line === "no laptop screen")
         screen.push("no laptop screen to lower the refresh rate of")
     }
     var what = mode === "saver" ? "power-saver on" : "power-saver off"
@@ -358,15 +405,58 @@ Item {
       warn(what + " failed: " + error + (done.length > 0 ? " (done before that: " + done.join("; ") + ")" : ""))
     else if (done.length > 0)
       log(what + ": " + done.join("; "))
+
+    if (notice && notifications) {
+      var sentences = []
+      if (notice.auto)
+        sentences.push("Battery at " + notice.auto.level + "%, switched from " + notice.auto.from + ".")
+      if (mode === "saver") {
+        if (off.length > 0)
+          sentences.push(capitalize(joinAnd(off.map(effectLabel))) + " off.")
+        if (dimmedTo !== "")
+          sentences.push("Screen dimmed to " + dimmedTo + "%.")
+        if (refreshTo !== "" && problems.length === 0)
+          sentences.push("Refresh rate lowered to " + refreshTo + " Hz.")
+      } else {
+        if (restored)
+          back.unshift("effects")
+        if (back.length > 0)
+          sentences.push(capitalize(joinAnd(back)) + " restored.")
+      }
+      if (error !== "" || problems.length > 0)
+        sentences.push("Not everything could be changed, see the log.")
+      notify(mode === "saver" ? "Power-saver on" : "Power-saver off", sentences.join(" "), notice.auto ? "normal" : "low")
+    }
+  }
+
+  function effectLabel(name) {
+    return name === "motionBlur" ? "motion blur" : name
+  }
+
+  // ["a", "b", "c"] -> "a, b and c"
+  function joinAnd(list) {
+    return list.length < 2 ? list.join("") : list.slice(0, -1).join(", ") + " and " + list[list.length - 1]
+  }
+
+  function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  }
+
+  // Through Omarchy's own sender, as its battery warning does; it passes the
+  // text to D-Bus as plain values, never through a shell. The glyph is the
+  // leaf Omarchy's power panel shows for power-saver.
+  function notify(headline, body, urgency) {
+    Quickshell.execDetached(["omarchy-notification-send", "-g", "󰌪", "-u", urgency, headline, body])
   }
 
   Process {
     id: effectsProcess
     property string key: ""
     property string mode: ""
+    property var notice: null
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.reportRun(effectsProcess.mode, text)
+      onStreamFinished: root.reportRun(effectsProcess.mode, text, effectsProcess.notice)
     }
     stderr: StdioCollector {
       waitForEnd: true
@@ -384,7 +474,7 @@ Item {
     }
   }
 
-  onSaverChanged: apply()
+  onSaverChanged: profileSwitched()
   onEffectsKeyChanged: apply()
 
   Connections {

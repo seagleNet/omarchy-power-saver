@@ -15,7 +15,9 @@ An [Omarchy](https://omarchy.org/) shell plugin that saves battery in two ways:
   laptop screen's brightness and refresh rate while `power-saver` is active,
   and put them back when `power-saver` ends.
 
-It is a background service with no bar widget.
+It is a background service with no bar widget. When `power-saver` switches on
+or off it shows a notification saying what changed, and for the low-battery
+switch, why.
 
 ## Requirements
 
@@ -55,6 +57,7 @@ Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:
     "id": "seaglenet.power-saver",
     "threshold": 25,
     "dim": 40,
+    "notify": true,
     "refreshRate": 60,
     "disable": { "transparency": true, "animations": false }
   }
@@ -68,6 +71,11 @@ Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:
   that is already as dim or dimmer is left as it is. When `power-saver` ends,
   the brightness goes back to what it was, unless you changed it in the
   meantime; then your setting stays. External monitors are not dimmed.
+- `notify`: `false` to switch off the notifications when `power-saver` starts
+  and ends. Defaults to `true`. They say what the plugin changed, such as
+  "Animations, blur and shadows off. Screen dimmed to 40%.", and after the
+  low-battery switch also the battery level and the profile it switched from.
+  None is shown when the shell or plugin restarts.
 - `refreshRate` (experimental): the highest refresh rate, from 30 Hz, for the
   built-in screen in `power-saver`, or `false` to leave it alone. Defaults to
   `false`. Only rates the screen offers at its current resolution are used:
