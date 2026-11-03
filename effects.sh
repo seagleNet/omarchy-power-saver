@@ -179,20 +179,31 @@ shift
 content=""
 dim=""
 refresh=""
-refresh_rule="" refresh_name="" refresh_target=""
-previous_rate=$(sed -n 's/.* -- refresh rate was \([0-9.]*\)$/\1/p' "$file" 2>/dev/null)
+refresh_rule=""
+refresh_name=""
+refresh_target=""
+# The rate from before the rule an earlier run wrote, from its comment.
+previous_rate=""
+rate_comment=" -- refresh rate was ([0-9.]+)"
+if [[ -f $file && "$(<"$file")" =~ $rate_comment ]]; then
+    previous_rate=${BASH_REMATCH[1]}
+fi
 if [[ $mode == saver ]]; then
     for effect in "$@"; do
         option="" line=""
         case $effect in
         dim=*)
             dim=${effect#dim=}
-            [[ $dim =~ ^[0-9]+$ ]] && ((dim >= 1 && dim <= 100)) || fail "invalid dim level ${dim@Q}, expected 1 to 100"
+            if ! [[ $dim =~ ^[0-9]+$ ]] || ((dim < 1 || dim > 100)); then
+                fail "invalid dim level ${dim@Q}, expected 1 to 100"
+            fi
             continue
             ;;
         refresh=*)
             refresh=${effect#refresh=}
-            [[ $refresh =~ ^[0-9]+$ ]] && ((refresh >= 30 && refresh <= 1000)) || fail "invalid refresh rate ${refresh@Q}, expected 30 to 1000"
+            if ! [[ $refresh =~ ^[0-9]+$ ]] || ((refresh < 30 || refresh > 1000)); then
+                fail "invalid refresh rate ${refresh@Q}, expected 30 to 1000"
+            fi
             continue
             ;;
         animations) option=animations.enabled line="hl.config({ animations = { enabled = false } })" ;;
