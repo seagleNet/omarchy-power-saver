@@ -104,6 +104,11 @@ are skipped. Changes apply without a restart, also while `power-saver` is
 active. Invalid values are logged and replaced by their defaults. The plugin
 only reads `shell.json`, it never writes to it.
 
+`omarchy plugin disable` removes the plugin's whole entry from `shell.json`,
+settings included, and `omarchy plugin enable` adds back an empty one. Copy
+your settings first if you want to keep them, and add them again after
+enabling.
+
 ## How it works
 
 The profile is set through Quickshell's `PowerProfiles` service, not through
