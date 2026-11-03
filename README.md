@@ -11,6 +11,9 @@ An [Omarchy](https://omarchy.org/) shell plugin that saves battery in two ways:
   animations, blur, shadows, glow, motion blur and wobble. Leaving
   `power-saver` brings back exactly what you had, including effects you turned
   off yourself.
+- **Dimmer screen in power-saver (optional):** it can also lower the laptop
+  screen's brightness while `power-saver` is active, and put it back when
+  `power-saver` ends.
 
 It is a background service with no bar widget.
 
@@ -18,6 +21,7 @@ It is a background service with no bar widget.
 
 - Omarchy 4 with the Lua Hyprland config
 - `power-profiles-daemon` and UPower (both part of Omarchy)
+- `brightnessctl` for `dim` (part of Omarchy)
 
 ## Install
 
@@ -50,6 +54,7 @@ Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:
   {
     "id": "seaglenet.power-saver",
     "threshold": 25,
+    "dim": 40,
     "disable": { "transparency": true, "animations": false }
   }
 ]
@@ -57,6 +62,11 @@ Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:
 
 - `threshold`: the battery percentage, from 5 to 95, at which to switch to
   `power-saver`. Defaults to 20. The battery is checked every 30 seconds.
+- `dim`: the brightness, from 1 to 100%, to lower the built-in screen to in
+  `power-saver`, or `false` to leave it alone. Defaults to `false`. A screen
+  that is already as dim or dimmer is left as it is. When `power-saver` ends,
+  the brightness goes back to what it was, unless you changed it in the
+  meantime; then your setting stays. External monitors are not dimmed.
 - `disable`: which effects to turn off in `power-saver`. Each key is `true` or
   `false`; effects you leave out keep their default.
   - `animations`: window, workspace and layer animations (default `true`)
@@ -89,6 +99,12 @@ The file is removed when `power-saver` ends, and whenever the plugin is
 unloaded: on disable or removal, but also on a plugin reload, shell restart or
 logout. In `power-saver` the plugin writes it again as soon as it is loaded,
 so a reload then briefly brings the effects back.
+
+With `dim`, the screen is dimmed through `brightnessctl`, on the backlight
+`omarchy-hw-display` picks. The brightness from before is kept in
+`$XDG_RUNTIME_DIR/seaglenet-power-saver.brightness` and put back at the same
+times the effects are, so a reload in `power-saver` also briefly brightens the
+screen. If you changed the brightness while dimmed, a reload dims it again.
 
 ## Logs
 
@@ -125,7 +141,7 @@ text once at startup and runs it with `bash -c`, so the cleanup on removal does
 not depend on the file still being there. It can also be run on its own:
 
 ```sh
-bash effects.sh saver animations blur   # or: bash effects.sh normal
+bash effects.sh saver animations blur dim=40   # or: bash effects.sh normal
 ```
 
 QML is formatted with Qt's `qmlformat` using the checked-in `.qmlformat.ini`
@@ -141,7 +157,7 @@ The checks CI runs, on every push and pull request:
 ```sh
 /usr/lib/qt6/bin/qmllint Service.qml   # settings in .qmllint.ini
 shfmt -d . && shfmt -f . | xargs shellcheck
-bats tests                             # effects.sh against a fake hyprctl
+bats tests                             # effects.sh against fake hyprctl and brightnessctl
 ```
 
 CI has no Hyprland, so after Hyprland or Omarchy updates, also run the

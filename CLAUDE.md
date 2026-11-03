@@ -11,7 +11,7 @@ wrong:
   the plugin directory right after unloading it, and the cleanup on unload
   must still work. Keep it that way.
 - `reportRun` in `Service.qml` parses the lines `effects.sh` prints (`off`,
-  `skipped`, `restored`, `error:`). Change one, change the other and
+  `skipped`, `restored`, the `dimmed`/`brightness` lines, `error:`). Change one, change the other and
   `tests/effects.bats`.
 - Saving a file restarts the plugin, but with the QML the shell already
   loaded, even after `omarchy-shell shell rescanPlugins`. To try a

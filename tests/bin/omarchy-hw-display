@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Stand-in for omarchy-hw-display in the effects.sh tests: names the fake
+# brightnessctl's backlight, or none when $BRIGHTNESS_NONE is set.
+
+[[ -z ${BRIGHTNESS_NONE:-} ]] || exit 1
+echo panel

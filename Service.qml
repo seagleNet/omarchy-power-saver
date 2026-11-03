@@ -15,6 +15,8 @@ import Quickshell.Services.UPower
 //    which Omarchy loads after the user's config, the way its own toggles work.
 //    The file only ever turns things off, so removing it brings back exactly
 //    what the user had, including effects they turned off themselves.
+//    If "dim" is set, it also lowers the built-in panel's backlight, and puts
+//    it back afterwards unless the user changed it in the meantime.
 //
 // The file is removed when the service is unloaded, which is the only hook a
 // plugin gets when it is disabled or removed. That also happens on a plugin
@@ -41,12 +43,15 @@ Item {
     })
 
   // Settings live on this plugin's entry in ~/.config/omarchy/shell.json: a
-  // "threshold" percentage and a "disable" object of effect names to booleans.
+  // "threshold" percentage, a "disable" object of effect names to booleans and
+  // a "dim" percentage for the backlight, or false for none.
   // The shell hands service plugins no settings, so the file is read here. It
   // is only ever read, never written.
   property int threshold: defaultThreshold
   property var effects: defaultEffects()
-  readonly property string effectsKey: effects.join(" ")
+  // The backlight percentage to dim to in power-saver; 0 leaves it alone.
+  property int dim: 0
+  readonly property string effectsKey: effects.join(" ") + (dim > 0 ? " dim=" + dim : "")
   // The last settings problems reported, so a file reload repeats none.
   property string settingsWarning: ""
   // Set once the startup line is logged, which already names the settings.
@@ -72,10 +77,15 @@ Item {
     return list.length > 0 ? list.join(", ") : "nothing"
   }
 
+  function describeDim(level) {
+    return level > 0 ? "dimming the screen to " + level + "%" : "not dimming the screen"
+  }
+
   // A missing or empty file means the defaults; one that does not parse keeps
   // the current settings, since it is most likely being edited.
   function readSettings() {
     var nextThreshold = defaultThreshold
+    var nextDim = 0
     var chosen = Object.assign({}, effectDefaults)
     var problems = []
     var raw = String(settingsFile.text() || "")
@@ -104,6 +114,13 @@ Item {
         else
           problems.push("ignoring threshold " + JSON.stringify(entry.threshold) + ", expected a number from 5 to 95; using " + defaultThreshold + "%")
       }
+      if (entry && entry.dim !== undefined && entry.dim !== false) {
+        var level = entry.dim
+        if (typeof level === "number" && isFinite(level) && level >= 1 && level <= 100)
+          nextDim = Math.round(level)
+        else
+          problems.push("ignoring dim " + JSON.stringify(entry.dim) + ", expected a percentage from 1 to 100 or false; not dimming the screen")
+      }
       if (entry && entry.disable !== undefined) {
         var disable = entry.disable
         if (!disable || typeof disable !== "object" || Array.isArray(disable)) {
@@ -131,10 +148,13 @@ Item {
     })
     if (started && nextThreshold !== threshold)
       log("threshold " + nextThreshold + "%")
-    if (started && nextEffects.join(" ") !== effectsKey)
+    if (started && nextEffects.join(" ") !== effects.join(" "))
       log("in power-saver, turning off: " + describeEffects(nextEffects))
+    if (started && nextDim !== dim)
+      log("in power-saver, " + describeDim(nextDim))
     threshold = nextThreshold
     effects = nextEffects
+    dim = nextDim
   }
 
   FileView {
@@ -216,7 +236,7 @@ Item {
       return
     pending = {
       "key": want,
-      "args": saver ? ["saver"].concat(effects) : ["normal"]
+      "args": saver ? ["saver"].concat(effects, dim > 0 ? ["dim=" + dim] : []) : ["normal"]
     }
     if (!effectsProcess.running)
       runPending()
@@ -249,6 +269,7 @@ Item {
     var off = []
     var skipped = []
     var restored = false
+    var screen = []
     var error = ""
     var lines = String(output || "").split("\n")
     for (var i = 0; i < lines.length; i++) {
@@ -261,6 +282,16 @@ Item {
         skipped.push(line.slice(8))
       else if (line === "restored")
         restored = true
+      else if (line.indexOf("dimmed ") === 0)
+        screen.push("dimmed the screen from " + line.slice(7).replace(" ", "% to ") + "%")
+      else if (line.indexOf("not dimmed ") === 0)
+        screen.push("screen already at " + line.slice(11) + "%, not dimmed")
+      else if (line.indexOf("brightness restored ") === 0)
+        screen.push("brightness restored to " + line.slice(20) + "%")
+      else if (line.indexOf("brightness kept ") === 0)
+        screen.push("brightness left at " + line.slice(16) + "%, since it was changed while dimmed")
+      else if (line === "no backlight")
+        screen.push("no backlight to dim")
     }
     var what = mode === "saver" ? "power-saver on" : "power-saver off"
     var done = []
@@ -270,6 +301,7 @@ Item {
       done.push("skipped " + skipped.join(", ") + " (not in this Hyprland)")
     if (restored)
       done.push("effects restored")
+    done = done.concat(screen)
     if (error !== "")
       warn(what + " failed: " + error + (done.length > 0 ? " (done before that: " + done.join("; ") + ")" : ""))
     else if (done.length > 0)
@@ -329,7 +361,7 @@ Item {
     onTriggered: {
       var level = root.batteryLevel()
       var power = level < 0 ? "no battery" : level + "% " + (UPower.onBattery ? "on battery" : "on AC")
-      root.log("started: profile " + root.profileName() + ", " + power + ", threshold " + root.threshold + "%, in power-saver turning off: " + root.describeEffects(root.effects))
+      root.log("started: profile " + root.profileName() + ", " + power + ", threshold " + root.threshold + "%, in power-saver turning off: " + root.describeEffects(root.effects) + ", " + root.describeDim(root.dim))
       root.started = true
       root.apply()
     }
@@ -343,7 +375,7 @@ Item {
   // Detached, so the cleanup outlives this object. It reports nothing back,
   // since nothing is left to receive it.
   Component.onDestruction: {
-    log(applied.indexOf("saver") === 0 ? "stopped, restoring effects" : "stopped")
+    log(applied.indexOf("saver") === 0 ? "stopped, restoring effects" + (applied.indexOf(" dim=") !== -1 ? " and brightness" : "") : "stopped")
     if (effectsScript !== "")
       Quickshell.execDetached(["bash", "-c", effectsScript, "power-saver", "normal"])
   }

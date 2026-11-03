@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Stand-in for brightnessctl in the effects.sh tests: one backlight, "panel",
+# whose raw level is kept in $BRIGHTNESS_FILE, out of $BRIGHTNESS_MAX (1000).
+# Rounds every level it is set to down to a multiple of $BRIGHTNESS_STEP (1),
+# like a driver with coarse steps. Supports `-m -d panel` and
+# `-q -d panel set <raw>`; $BRIGHTNESS_FAIL_SET makes setting fail.
+
+max=${BRIGHTNESS_MAX:-1000}
+step=${BRIGHTNESS_STEP:-1}
+device="" set=""
+while (($#)); do
+    case $1 in
+    -d) device=$2 && shift ;;
+    set) set=$2 && shift ;;
+    esac
+    shift
+done
+[[ $device == panel ]] || {
+    echo "Device '$device' not found." >&2
+    exit 1
+}
+if [[ -n $set ]]; then
+    if [[ -n ${BRIGHTNESS_FAIL_SET:-} ]]; then
+        echo "permission denied" >&2
+        exit 1
+    fi
+    echo $((set / step * step)) >"$BRIGHTNESS_FILE"
+    exit 0
+fi
+current=$(<"$BRIGHTNESS_FILE")
+echo "panel,backlight,$current,$(((current * 100 + max / 2) / max))%,$max"
