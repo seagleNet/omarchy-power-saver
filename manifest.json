@@ -2,7 +2,7 @@
     "schemaVersion": 1,
     "id": "seaglenet.power-saver",
     "name": "Power Saver",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "author": "seagleNet",
     "description": "Switches to power-saver at low battery and turns off the desktop effects you choose, and optionally dims the screen and lowers its refresh rate, while power-saver is active.",
     "kinds": [
