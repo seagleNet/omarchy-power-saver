@@ -220,8 +220,8 @@ if [[ $mode == saver ]]; then
         case $effect in
         dim=*)
             dim=${effect#dim=}
-            if ! [[ $dim =~ ^[1-9][0-9]{0,2}$ ]] || ((dim > 100)); then
-                fail "invalid dim level ${dim@Q}, expected 1 to 100"
+            if ! [[ $dim =~ ^[1-9][0-9]{1,2}$ ]] || ((dim > 100)); then
+                fail "invalid dim level ${dim@Q}, expected 10 to 100"
             fi
             continue
             ;;

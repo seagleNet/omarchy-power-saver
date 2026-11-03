@@ -136,10 +136,10 @@ Item {
       }
       if (entry && entry.dim !== undefined && entry.dim !== false) {
         var level = entry.dim
-        if (typeof level === "number" && isFinite(level) && level >= 1 && level <= 100)
+        if (typeof level === "number" && isFinite(level) && level >= 10 && level <= 100)
           nextDim = Math.round(level)
         else
-          problems.push("ignoring dim " + JSON.stringify(entry.dim) + ", expected a percentage from 1 to 100 or false; not dimming the screen")
+          problems.push("ignoring dim " + JSON.stringify(entry.dim) + ", expected a percentage from 10 to 100 or false; not dimming the screen")
       }
       if (entry && entry.refreshRate !== undefined && entry.refreshRate !== false) {
         var rate = entry.refreshRate

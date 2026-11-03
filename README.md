@@ -66,7 +66,7 @@ Settings go on the plugin's entry in `~/.config/omarchy/shell.json`:
 
 - `threshold`: the battery percentage, from 5 to 95, at which to switch to
   `power-saver`. Defaults to 20. The battery is checked every 30 seconds.
-- `dim`: the brightness, from 1 to 100%, to lower the built-in screen to in
+- `dim`: the brightness, from 10 to 100%, to lower the built-in screen to in
   `power-saver`, or `false` to leave it alone. Defaults to `false`. A screen
   that is already as dim or dimmer is left as it is. When `power-saver` ends,
   the brightness goes back to what it was, unless you changed it in the

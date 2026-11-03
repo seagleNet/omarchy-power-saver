@@ -170,7 +170,7 @@ brightness() {
 }
 
 @test "an invalid dim level fails without touching anything" {
-    for level in 0 101 abc ""; do
+    for level in 0 1 9 101 abc ""; do
         effects saver animations "dim=$level"
         [ "$status" -eq 1 ]
         [[ $output == *"error: invalid dim level"* ]]
@@ -395,9 +395,10 @@ hl.config({ decoration = { blur = { enabled = false } } })" ]
 }
 
 @test "dim never turns the backlight off, even with few levels" {
-    echo 10 >"$BRIGHTNESS_FILE"
-    BRIGHTNESS_MAX=10 effects saver dim=1
+    # 10% of 4 levels rounds to 0.
+    echo 4 >"$BRIGHTNESS_FILE"
+    BRIGHTNESS_MAX=4 effects saver dim=10
     [ "$status" -eq 0 ]
-    [ "$output" = "dimmed 100 10" ]
+    [ "$output" = "dimmed 100 25" ]
     [ "$(brightness)" -eq 1 ]
 }
